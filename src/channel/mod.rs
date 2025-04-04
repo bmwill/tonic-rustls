@@ -6,7 +6,7 @@ pub(crate) mod service;
 pub use endpoint::Endpoint;
 
 use self::service::{Connection, DynamicServiceStream, Executor, SharedExec};
-use tonic::body::BoxBody;
+use tonic::body::Body;
 use bytes::Bytes;
 use http::{
     uri::{InvalidUri, Uri},
@@ -60,14 +60,14 @@ const DEFAULT_BUFFER_SIZE: usize = 1024;
 /// cloning the `Channel` type is cheap and encouraged.
 #[derive(Clone)]
 pub struct Channel {
-    svc: Buffer<Request<BoxBody>, BoxFuture<'static, Result<Response<BoxBody>, crate::BoxError>>>,
+    svc: Buffer<Request<Body>, BoxFuture<'static, Result<Response<Body>, crate::BoxError>>>,
 }
 
 /// A future that resolves to an HTTP response.
 ///
 /// This is returned by the `Service::call` on [`Channel`].
 pub struct ResponseFuture {
-    inner: BufferResponseFuture<BoxFuture<'static, Result<Response<BoxBody>, crate::BoxError>>>,
+    inner: BufferResponseFuture<BoxFuture<'static, Result<Response<Body>, crate::BoxError>>>,
 }
 
 impl Channel {
@@ -194,8 +194,8 @@ impl Channel {
     }
 }
 
-impl Service<http::Request<BoxBody>> for Channel {
-    type Response = http::Response<BoxBody>;
+impl Service<http::Request<Body>> for Channel {
+    type Response = http::Response<Body>;
     type Error = super::Error;
     type Future = ResponseFuture;
 
@@ -203,7 +203,7 @@ impl Service<http::Request<BoxBody>> for Channel {
         Service::poll_ready(&mut self.svc, cx).map_err(super::Error::from_source)
     }
 
-    fn call(&mut self, request: http::Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, request: http::Request<Body>) -> Self::Future {
         let inner = Service::call(&mut self.svc, request);
 
         ResponseFuture { inner }
@@ -211,7 +211,7 @@ impl Service<http::Request<BoxBody>> for Channel {
 }
 
 impl Future for ResponseFuture {
-    type Output = Result<Response<BoxBody>, super::Error>;
+    type Output = Result<Response<Body>, super::Error>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         Pin::new(&mut self.inner)

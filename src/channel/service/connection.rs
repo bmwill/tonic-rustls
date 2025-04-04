@@ -8,7 +8,7 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
-use tonic::body::{boxed, BoxBody};
+use tonic::body::Body;
 use tower::load::Load;
 use tower::{
     layer::Layer,
@@ -19,7 +19,7 @@ use tower::{
 use tower_service::Service;
 
 pub(crate) struct Connection {
-    inner: BoxService<Request<BoxBody>, Response<BoxBody>, crate::BoxError>,
+    inner: BoxService<Request<Body>, Response<Body>, crate::BoxError>,
 }
 
 impl Connection {
@@ -75,7 +75,10 @@ impl Connection {
         }
     }
 
-    pub(crate) async fn connect<C>(connector: C, endpoint: Endpoint) -> Result<Self, crate::BoxError>
+    pub(crate) async fn connect<C>(
+        connector: C,
+        endpoint: Endpoint,
+    ) -> Result<Self, crate::BoxError>
     where
         C: Service<Uri> + Send + 'static,
         C::Error: Into<crate::BoxError> + Send,
@@ -96,8 +99,8 @@ impl Connection {
     }
 }
 
-impl Service<Request<BoxBody>> for Connection {
-    type Response = Response<BoxBody>;
+impl Service<Request<Body>> for Connection {
+    type Response = Response<Body>;
     type Error = crate::BoxError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -105,7 +108,7 @@ impl Service<Request<BoxBody>> for Connection {
         Service::poll_ready(&mut self.inner, cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, req: Request<Body>) -> Self::Future {
         self.inner.call(req)
     }
 }
@@ -125,17 +128,17 @@ impl fmt::Debug for Connection {
 }
 
 struct SendRequest {
-    inner: hyper::client::conn::http2::SendRequest<BoxBody>,
+    inner: hyper::client::conn::http2::SendRequest<Body>,
 }
 
-impl From<hyper::client::conn::http2::SendRequest<BoxBody>> for SendRequest {
-    fn from(inner: hyper::client::conn::http2::SendRequest<BoxBody>) -> Self {
+impl From<hyper::client::conn::http2::SendRequest<Body>> for SendRequest {
+    fn from(inner: hyper::client::conn::http2::SendRequest<Body>) -> Self {
         Self { inner }
     }
 }
 
-impl tower::Service<Request<BoxBody>> for SendRequest {
-    type Response = Response<BoxBody>;
+impl tower::Service<Request<Body>> for SendRequest {
+    type Response = Response<Body>;
     type Error = crate::BoxError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -143,10 +146,10 @@ impl tower::Service<Request<BoxBody>> for SendRequest {
         self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: Request<BoxBody>) -> Self::Future {
+    fn call(&mut self, req: Request<Body>) -> Self::Future {
         let fut = self.inner.send_request(req);
 
-        Box::pin(async move { fut.await.map_err(Into::into).map(|res| res.map(boxed)) })
+        Box::pin(async move { fut.await.map_err(Into::into).map(|res| res.map(Body::new)) })
     }
 }
 
