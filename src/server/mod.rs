@@ -486,8 +486,8 @@ impl<L> Server<L> {
     /// let layer = ServiceBuilder::new()
     ///     .load_shed()
     ///     .timeout(Duration::from_secs(30))
-    ///     .layer(interceptor(auth_interceptor))
-    ///     .layer(interceptor(some_other_interceptor))
+    ///     .layer(auth_interceptor)
+    ///     .layer(some_other_interceptor)
     ///     .into_inner();
     ///
     /// Server::builder().layer(layer);
